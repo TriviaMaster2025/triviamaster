@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,9 +13,11 @@
                 <div class="quiz-score flex">
                     <span id="current-question">1</span>/<span id="total-question">10</span>
                 </div>
+                <div class="quiz-timer">Time Left: <span id="timer">20</span> sec</div>
             </div>
             <div class="quiz-body">
                 <h2 class="quiz-question" id="question">Loading question...</h2>
+                <p id="difficulty" class="difficulty">Difficulty: Loading...</p>
                 <ul class="quiz-options" id="optionsList"></ul>
                 <div id="result"></div>
                 <button id="submitScoreButton" style="display: none;" onclick="submitScore()">Submit Score</button>
@@ -28,14 +29,14 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
         import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
 
-        // Firebase Configuration
         const firebaseConfig = {
-    apiKey: "AIzaSyAN-2cHFGlzZ0Vg-t5o6A6S42IoXXEoWBY",
-    authDomain: "triviamaster-14d6e.firebaseapp.com",
-    projectId: "triviamaster-14d6e",
-    storageBucket: "triviamaster-14d6e.firebasestorage.app",
-    messagingSenderId: "1071448827763",
-    appId: "1:1071448827763:web:7ac65efed0dfcb4b060706"
+            apiKey: "AIzaSyDeQgBtWQVOfamEmMSUPYqpjDiVV7ynVZE",
+            authDomain: "quiz-ca110.firebaseapp.com",
+            databaseURL: "https://quiz-ca110-default-rtdb.firebaseio.com/",
+            projectId: "quiz-ca110",
+            storageBucket: "quiz-ca110.appspot.com",
+            messagingSenderId: "184289263241",
+            appId: "1:184289263241:web:c6b1d9490a4a9c404f9058"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -44,45 +45,54 @@
         let userScore = 0;
         let currentQuestionIndex = 0;
         const totalQuestions = 10;
-        let questionData = []; // Store fetched questions
+        let questionData = [];
         let correctAnswer = "";
+        let timer;
+        const timeLimit = 20;
 
-        // Fetch questions from API
         async function loadQuestions() {
             const APIUrl = 'https://opentdb.com/api.php?amount=10&category=18';
             try {
                 const response = await fetch(APIUrl);
                 const data = await response.json();
-                questionData = data.results;  // Store the questions
-                loadQuestion();  // Load the first question
+                questionData = data.results;
+                loadQuestion();
             } catch (error) {
                 console.error('Failed to fetch questions:', error);
             }
         }
 
-        // Load a question
         function loadQuestion() {
             if (currentQuestionIndex >= questionData.length) {
-                submitScore(); // Auto-submit after last question
+                submitScore();
                 return;
             }
+
+            clearTimeout(timer);
+            let countdown = timeLimit;
+            document.getElementById("timer").textContent = countdown;
+            timer = setInterval(() => {
+                countdown--;
+                document.getElementById("timer").textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    moveToNextQuestion();
+                }
+            }, 1000);
 
             const questionObj = questionData[currentQuestionIndex];
             correctAnswer = questionObj.correct_answer;
             const incorrectAnswers = questionObj.incorrect_answers;
             const optionsList = [...incorrectAnswers];
-
-            // Randomly insert the correct answer into the options
             optionsList.splice(Math.floor(Math.random() * (incorrectAnswers.length + 1)), 0, correctAnswer);
 
             document.getElementById("question").innerHTML = `${questionObj.question} <br> <span class="category">${questionObj.category}</span>`;
+            document.getElementById("difficulty").innerText = `Difficulty: ${questionObj.difficulty}`;
             document.getElementById("current-question").innerText = currentQuestionIndex + 1;
             document.getElementById("optionsList").innerHTML = optionsList.map(option => `<li>${option}</li>`).join('');
-
             enableOptionSelection();
         }
 
-        // Enable selecting an answer
         function enableOptionSelection() {
             document.querySelectorAll('.quiz-options li').forEach(option => {
                 option.addEventListener('click', () => {
@@ -95,43 +105,42 @@
             });
         }
 
-        // Handle the answer
         function handleAnswer(selectedAnswer) {
+            clearInterval(timer);
             if (selectedAnswer === correctAnswer) {
                 userScore++;
             }
+            moveToNextQuestion();
+        }
 
+        function moveToNextQuestion() {
             currentQuestionIndex++;
-
             setTimeout(() => {
                 if (currentQuestionIndex < totalQuestions) {
                     loadQuestion();
                 } else {
                     submitScore();
                 }
-            }, 2000); // Wait 2 seconds before next question
+            }, 1000);
         }
 
-        // Submit and store score in Firebase
         function submitScore() {
+            clearInterval(timer);
             const userName = localStorage.getItem("currentUser");
-
             if (!userName) {
                 alert("User not registered.");
-                window.location.href = 'index.html'; // Redirect if no user
+                window.location.href = 'index.html';
                 return;
             }
-
             const finalScore = Math.min(Math.max(userScore, 0), totalQuestions);
-
             update(ref(db, 'users/' + userName), { score: finalScore })
                 .then(() => {
                     alert(`Score submitted! You scored ${finalScore}/${totalQuestions}.`);
-                    window.location.href = 'index.html'; // Redirect home
+                    window.location.href = 'index.html';
                 })
                 .catch(error => {
                     console.error("Error submitting score:", error);
-                    window.location.href = 'index.html'; // Redirect even on error
+                    window.location.href = 'index.html';
                 });
         }
 
